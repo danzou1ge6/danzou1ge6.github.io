@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Danzou1ge6</title><link>/</link><description>Recent content on Danzou1ge6</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Mon, 06 Feb 2023 18:21:30 +0800</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml"/><item><title>Audlyrics</title><link>/posts/audlyrics/</link><pubDate>Mon, 06 Feb 2023 18:21:30 +0800</pubDate><guid>/posts/audlyrics/</guid><description>动机 偶然发现一直在用的音乐播放器 Audacious 附带了一个命令行工具 audtool ，可以控制播放和获取播放信息。
+这东西好啊，一直以来在 Plasmashell 上显示歌词的执念终于可以满足了。
+技术路线 说起 Plasmashell 当然得是 Plamoid ，写 Plasmoid 当然得用 QML 。 但是吧， QML 框架好像不能直接访问文件系统，也不能执行命令，而要做到这些就得用 C++ ，这就很头疼了。
+所以思索之下，我最终选择了用 Rust 写一个服务器，然后 QML 只负责展示。
+Rust 的服务器框架随便选了个 Hyper 。
+实现 思路很简单，在服务端开子进程执行 audtool ，获取当前曲目位置和播放时间，刚好我的歌词就存在曲目边上，和音频文件同名。
+从歌词文件里读出来 LRC 格式的文本，然后解析后存起来，前端轮询的时候根据播放时间返回当前句子就行了。
+QML 懒得学，但是刚好看见过一个叫 ypm-lyrics 的 Plasmoid ，这个是用来显示网易云第三方客户端 YesplayMusic 的歌词的，就直接拿来用了。
+在和 Rust 的异步生命周期检查搏斗许久之后，终于搞定了服务端。
+从中总结出来的经验是：闭包写短点，要不然容易晕。。。（汗
+然后为了无感启动和关闭服务端，又为了不想让服务端一直开着（虽然基本不会占资源），在启动服务端时会把 Audacious 作为子进程启动，然后守护 Audacious 退出。
+rust 服务器核心代码 let mut child = Command::new(&amp;#34;audacious&amp;#34;).spawn() .expect(&amp;#34;Cannot start audacious. Is it Installed?&amp;#34;); let state = Arc::new(Mutex::new(State::new())); let make_service = make_service_fn(move |_: &amp;amp;AddrStream| { let state = state.</description><content>&lt;h2 id="动机">动机&lt;/h2>
+&lt;p>偶然发现一直在用的音乐播放器 Audacious 附带了一个命令行工具 &lt;code>audtool&lt;/code> ，可以控制播放和获取播放信息。&lt;/p>
+&lt;p>这东西好啊，一直以来在 Plasmashell 上显示歌词的执念终于可以满足了。&lt;/p>
+&lt;h2 id="技术路线">技术路线&lt;/h2>
+&lt;p>说起 Plasmashell 当然得是 Plamoid ，写 Plasmoid 当然得用 QML 。
+但是吧， QML 框架好像不能直接访问文件系统，也不能执行命令，而要做到这些就得用 C++ ，这就很头疼了。&lt;/p>
+&lt;p>所以思索之下，我最终选择了用 Rust 写一个服务器，然后 QML 只负责展示。&lt;/p>
+&lt;p>Rust 的服务器框架随便选了个 Hyper 。&lt;/p>
+&lt;h2 id="实现">实现&lt;/h2>
+&lt;p>思路很简单，在服务端开子进程执行 &lt;code>audtool&lt;/code> ，获取当前曲目位置和播放时间，刚好我的歌词就存在曲目边上，和音频文件同名。&lt;/p>
+&lt;p>从歌词文件里读出来 LRC 格式的文本，然后解析后存起来，前端轮询的时候根据播放时间返回当前句子就行了。&lt;/p>
+&lt;p>QML 懒得学，但是刚好看见过一个叫 &lt;code>ypm-lyrics&lt;/code> 的 Plasmoid ，这个是用来显示网易云第三方客户端 YesplayMusic 的歌词的，就直接拿来用了。&lt;/p>
+&lt;p>在和 Rust 的异步生命周期检查搏斗许久之后，终于搞定了服务端。&lt;/p>
+&lt;p>从中总结出来的经验是：闭包写短点，要不然容易晕。。。（汗&lt;/p>
+&lt;p>然后为了无感启动和关闭服务端，又为了不想让服务端一直开着（虽然基本不会占资源），在启动服务端时会把 Audacious 作为子进程启动，然后守护 Audacious 退出。&lt;/p>
+&lt;div class="collapsable-code">
+&lt;input id="1" type="checkbox" />
+&lt;label for="1">
+&lt;span class="collapsable-code__language">rust&lt;/span>
+&lt;span class="collapsable-code__title">服务器核心代码&lt;/span>
+&lt;span class="collapsable-code__toggle" data-label-expand="Show" data-label-collapse="Hide">&lt;/span>
+&lt;/label>
+&lt;pre class="language-rust" >&lt;code>
+let mut child = Command::new(&amp;#34;audacious&amp;#34;).spawn()
+.expect(&amp;#34;Cannot start audacious. Is it Installed?&amp;#34;);
+let state = Arc::new(Mutex::new(State::new()));
+let make_service = make_service_fn(move |_: &amp;amp;AddrStream| {
+let state = state.clone();
+let service = service_fn(
+move |req: Request&amp;lt;Body&amp;gt;| {
+handle(state.clone(), req)
+});
+async move {
+Ok::&amp;lt;_, Infallible&amp;gt;(service)
+}
+});
+let addr = ([127, 0, 0, 1], 30123).into();
+let server = Server::bind(&amp;amp;addr).serve(make_service);
+let grace = server.with_graceful_shutdown(async move {
+match child.wait().await {
+Ok(code) =&amp;gt; println!(&amp;#34;Audacious returned with {}&amp;#34;, code),
+Err(e) =&amp;gt; println!(&amp;#34;Audacious returned with IoError {:?}&amp;#34;, e)
+};
+});
+if let Err(e) = grace.await {
+eprintln!(&amp;#34;Server error: {}&amp;#34;, e);
+}
+&lt;/code>&lt;/pre>
+&lt;/div>
+&lt;p>端口直接写死了。&lt;/p>
+&lt;img src="/emoji/bailan.jpg" height="150px">
+&lt;h2 id="效果">效果&lt;/h2>
+&lt;figure class="center" >
+&lt;img src="playing.png" alt="Playing" />
+&lt;figcaption class="right" >Playing&lt;/figcaption>
+&lt;/figure>
+&lt;figure class="center" >
+&lt;img src="paused.png" alt="Paused" />
+&lt;figcaption class="right" >Paused&lt;/figcaption>
+&lt;/figure>
+&lt;p>源代码可以在 &lt;a href="https://github.com/danzou1ge6/audlyrics/">Github&lt;/a> 找到。&lt;/p></content></item><item><title>hello_world</title><link>/posts/hello_world/</link><pubDate>Mon, 06 Feb 2023 17:27:18 +0800</pubDate><guid>/posts/hello_world/</guid><description>喂喂喂 testtesttest</description><content>&lt;p>喂喂喂
+testtesttest&lt;/p></content></item><item><title/><link>/about/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/about/</guid><description>Danzou1ge6&amp;rsquo;s Blog 19 岁，逝学生。工酱生。
+傻卵二次元。立华奏厨。（神户小）鸟厨。田中口三才厨。麻枝准厨。
+Rust 爱好者。 Python 爱好者。厌恶 C++。厌恶 Javascript。
+Manjaro Linux 用户。 KDE 拥护者。
+以上。
+Nice to meet you.</description><content>&lt;h1 id="danzou1ge6s-blog">Danzou1ge6&amp;rsquo;s Blog&lt;/h1>
+&lt;p>19 岁，逝学生。工酱生。&lt;/p>
+&lt;p>傻卵二次元。立华奏厨。（神户小）鸟厨。田中口三才厨。麻枝准厨。&lt;/p>
+&lt;p>Rust 爱好者。 Python 爱好者。厌恶 C++。厌恶 Javascript。&lt;/p>
+&lt;p>Manjaro Linux 用户。 KDE 拥护者。&lt;/p>
+&lt;p>以上。&lt;/p>
+&lt;p>Nice to meet you.&lt;/p></content></item></channel></rss>
