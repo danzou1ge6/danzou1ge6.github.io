@@ -85,4 +85,133 @@ Nice to meet you.</description><content>&lt;h1 id="danzou1ge6s-blog">Danzou1ge6&
 &lt;ul>
 &lt;li>&lt;a href="https://gigglewang.github.io/">https://gigglewang.github.io/&lt;/a>&lt;/li>
 &lt;li>&lt;a href="https://hitefork.github.io/">https://hitefork.github.io/&lt;/a>&lt;/li>
-&lt;/ul></content></item></channel></rss>
+&lt;/ul></content></item><item><title/><link>/posts/kmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/posts/kmp/</guid><description>KMP String Matching Algorithm Rational Brute-force string matching requires $O(MN)$ time, where $N$ is the length of the source string $S$, and $M$ is the length of the target string $P$.
+However, utilizing the following fact, time consumption can be further reduced:
+For example,
+Index: 012345 S = abxabx P = abxaby &amp;lt;- Attempt 1 abx &amp;lt;- Attempt 2 When Attempt 1 failed because $S[5] \ne P[5]$, $S[:4]$ has already been matched.</description><content>&lt;h1 id="kmp-string-matching-algorithm">KMP String Matching Algorithm&lt;/h1>
+&lt;h2 id="rational">Rational&lt;/h2>
+&lt;p>Brute-force string matching requires $O(MN)$ time, where $N$ is the length of the &lt;strong>source string&lt;/strong> $S$, and $M$ is the length of the &lt;strong>target string&lt;/strong> $P$.&lt;/p>
+&lt;p>However, utilizing the following fact, time consumption can be further reduced:&lt;/p>
+&lt;p>For example,&lt;/p>
+&lt;pre tabindex="0">&lt;code>Index: 012345
+S = abxabx
+P = abxaby &amp;lt;- Attempt 1
+abx &amp;lt;- Attempt 2
+&lt;/code>&lt;/pre>&lt;p>When Attempt 1 failed because $S[5] \ne P[5]$, $S[:4]$ has already been matched. Noticing that $P$ starts with &amp;ldquo;ab&amp;rdquo; while $S[3:5]$, which equals $P[3:5]$, is also &amp;ldquo;ab&amp;rdquo;, we can continue matching by aligning &amp;ldquo;x&amp;rdquo; at $P[2]$ with $S[5]$ as shown in Attempt 2.&lt;/p>
+&lt;h2 id="the-next-array">The &amp;ldquo;next&amp;rdquo; Array&lt;/h2>
+&lt;p>Therefore, the key to accelerating matching is by locating &lt;strong>longest identical prefix and suffix&lt;/strong>(LIPS) in $P[:j]$ for every $j$. We determine these prefixes and suffices with an &amp;ldquo;next&amp;rdquo; array $W$, defined as&lt;/p>
+&lt;p>$$
+W[i] = \max {k | P[:k] = P[i-k:i]
+$$&lt;/p>
+&lt;p>For example,&lt;/p>
+&lt;pre tabindex="0">&lt;code>Index: 012345
+P = abxaby
+W = 010012
+&lt;/code>&lt;/pre>&lt;p>To calculate $W$ from $P$, we use &lt;strong>recursion&lt;/strong>.&lt;/p>
+&lt;p>Firstly, $W[0]$ is certainly $0$.&lt;/p>
+&lt;p>Then, assuming that we have already obtained $W[i] = k$, and there exists $P[k] = P[i]$, we can simply set $W[i + 1]$ to $k + 1$.&lt;/p>
+&lt;p>However, when $P[k] \ne P[i]$, we will have to look for a shorter LIPS.&lt;/p>
+&lt;pre tabindex="0">&lt;code>Index: 0123456789ABCD
+P = abyabxabyabyz
+---- ----|
+----- -----| &amp;lt;- i = B, W[B] = W[A] + 1
+--- ---| &amp;lt;- i + 1 = C
+&lt;/code>&lt;/pre>&lt;p>For example, when $i = B$, there exists LIPS &amp;ldquo;abyab&amp;rdquo;, however when $i = C$, there only exists shorter &amp;ldquo;aby&amp;rdquo;. Noticing that the shorter prefix, which is &amp;ldquo;aby&amp;rdquo;, can be splitted into two part &amp;ldquo;ab&amp;rdquo; and &amp;ldquo;y&amp;rdquo;. &amp;ldquo;ab&amp;rdquo; is actually the LIPS of &amp;ldquo;abyab&amp;rdquo;, which is again the LIPS of $P[:B]$!&lt;/p>
+&lt;p>Therefore, all we have to do when $P[k] \ne P[i]$ is:&lt;/p>
+&lt;ul>
+&lt;li>Find the LIPS of $P[:k]$, length of which has been calculated and stored in $W[k] = l$.&lt;/li>
+&lt;li>See if $P[l] = P[i]$. If so, $W[i + 1]$ would be $l + 1$. Otherwise, $W[i + 1]$ would be 0.&lt;/li>
+&lt;/ul>
+&lt;p>The Rust code for solving $W$ is listed below. (To simplify stuff, char codes stored in &lt;code>Vec&amp;lt;char&amp;gt;&lt;/code> is used instead of UTF-8 encoded &lt;code>String&lt;/code>)&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-Rust" data-lang="Rust">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#e6db74">/// Wrapper for [`Vec&amp;lt;char&amp;gt;`]
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#e6db74">&lt;/span>&lt;span style="color:#66d9ef">struct&lt;/span> &lt;span style="color:#a6e22e">Chars&lt;/span>(Vec&lt;span style="color:#f92672">&amp;lt;&lt;/span>&lt;span style="color:#66d9ef">char&lt;/span>&lt;span style="color:#f92672">&amp;gt;&lt;/span>);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">impl&lt;/span> From&lt;span style="color:#f92672">&amp;lt;&amp;amp;&lt;/span>&lt;span style="color:#66d9ef">str&lt;/span>&lt;span style="color:#f92672">&amp;gt;&lt;/span> &lt;span style="color:#66d9ef">for&lt;/span> Chars {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">fn&lt;/span> &lt;span style="color:#a6e22e">from&lt;/span>(s: &lt;span style="color:#66d9ef">&amp;amp;&lt;/span>&lt;span style="color:#66d9ef">str&lt;/span>) -&amp;gt; &lt;span style="color:#a6e22e">Self&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> Self(s.chars().collect())
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">impl&lt;/span> From&lt;span style="color:#f92672">&amp;lt;&amp;amp;&lt;/span>Chars&lt;span style="color:#f92672">&amp;gt;&lt;/span> &lt;span style="color:#66d9ef">for&lt;/span> String {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">fn&lt;/span> &lt;span style="color:#a6e22e">from&lt;/span>(s: &lt;span style="color:#66d9ef">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">Chars&lt;/span>) -&amp;gt; &lt;span style="color:#a6e22e">Self&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> &lt;span style="color:#66d9ef">mut&lt;/span> st &lt;span style="color:#f92672">=&lt;/span> String::new();
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">for&lt;/span> &lt;span style="color:#f92672">&amp;amp;&lt;/span>c &lt;span style="color:#66d9ef">in&lt;/span> s.&lt;span style="color:#ae81ff">0.&lt;/span>iter() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> st.push(c);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> st
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">struct&lt;/span> &lt;span style="color:#a6e22e">Pattern&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> P: &lt;span style="color:#a6e22e">Chars&lt;/span>,
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> W: Vec&lt;span style="color:#f92672">&amp;lt;&lt;/span>&lt;span style="color:#66d9ef">usize&lt;/span>&lt;span style="color:#f92672">&amp;gt;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">impl&lt;/span> Pattern {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">fn&lt;/span> &lt;span style="color:#a6e22e">from&lt;/span>(P: &lt;span style="color:#66d9ef">&amp;amp;&lt;/span>&lt;span style="color:#66d9ef">str&lt;/span>) -&amp;gt; &lt;span style="color:#a6e22e">Self&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> P &lt;span style="color:#f92672">=&lt;/span> Chars::from(P);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> &lt;span style="color:#66d9ef">mut&lt;/span> W &lt;span style="color:#f92672">=&lt;/span> Vec::with_capacity(P.&lt;span style="color:#ae81ff">0.&lt;/span>len());
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> W.resize(P.&lt;span style="color:#ae81ff">0.&lt;/span>len(), &lt;span style="color:#ae81ff">0&lt;/span>);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">for&lt;/span> i &lt;span style="color:#66d9ef">in&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span>&lt;span style="color:#f92672">..&lt;/span>P.&lt;span style="color:#ae81ff">0.&lt;/span>len() &lt;span style="color:#f92672">-&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> k &lt;span style="color:#f92672">=&lt;/span> W[i];
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> W[i &lt;span style="color:#f92672">+&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span>] &lt;span style="color:#f92672">=&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> P.&lt;span style="color:#ae81ff">0&lt;/span>[i] &lt;span style="color:#f92672">==&lt;/span> P.&lt;span style="color:#ae81ff">0&lt;/span>[k] {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> k &lt;span style="color:#f92672">+&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> } &lt;span style="color:#66d9ef">else&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> l &lt;span style="color:#f92672">=&lt;/span> W[k];
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> P.&lt;span style="color:#ae81ff">0&lt;/span>[l] &lt;span style="color:#f92672">==&lt;/span> P.&lt;span style="color:#ae81ff">0&lt;/span>[i] { l &lt;span style="color:#f92672">+&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span> } &lt;span style="color:#66d9ef">else&lt;/span> { &lt;span style="color:#ae81ff">0&lt;/span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> };
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> Self { P, W }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-Rust" data-lang="Rust">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">let&lt;/span> pat &lt;span style="color:#f92672">=&lt;/span> Pattern::from(&lt;span style="color:#e6db74">&amp;#34;abyabxabyabyz&amp;#34;&lt;/span>);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>println!(&lt;span style="color:#e6db74">&amp;#34;P = {}&amp;#34;&lt;/span>, String::from(&lt;span style="color:#f92672">&amp;amp;&lt;/span>pat.P));
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>println!(&lt;span style="color:#e6db74">&amp;#34;W = {:?}&amp;#34;&lt;/span>, pat.W);
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;pre>&lt;code>P = abyabxabyabyz
+W = [0, 0, 0, 0, 1, 2, 0, 1, 2, 3, 4, 5, 3]
+&lt;/code>&lt;/pre>
+&lt;h2 id="matching">Matching&lt;/h2>
+&lt;p>Now we have the &amp;ldquo;next&amp;rdquo; array $W$, we can do the matching.&lt;/p>
+&lt;p>For example,&lt;/p>
+&lt;pre tabindex="0">&lt;code>Index: 0123456
+S = abyac &amp;lt;- j is used to index the char to be compared in S
+- &amp;lt;- Mismatch found when i = j = 4
+P = abyab &amp;lt;- i is used to index the char ... in P
+W = 00001
+abyab &amp;lt;- i set to W[i] = 1, and compare again
+&lt;/code>&lt;/pre>&lt;p>Now mismatch occurred when $i = j = 4$, and all we have to do is to align $P$ again.&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-Rust" data-lang="Rust">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">impl&lt;/span> Pattern {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">fn&lt;/span> &lt;span style="color:#a6e22e">match_str&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>self, s: &lt;span style="color:#66d9ef">&amp;amp;&lt;/span>&lt;span style="color:#66d9ef">str&lt;/span>) -&amp;gt; Option&lt;span style="color:#f92672">&amp;lt;&lt;/span>&lt;span style="color:#66d9ef">usize&lt;/span>&lt;span style="color:#f92672">&amp;gt;&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> &lt;span style="color:#66d9ef">mut&lt;/span> i &lt;span style="color:#f92672">=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span>;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> &lt;span style="color:#66d9ef">mut&lt;/span> j &lt;span style="color:#f92672">=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span>;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">let&lt;/span> s &lt;span style="color:#f92672">=&lt;/span> Chars::from(s);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">loop&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> i &lt;span style="color:#f92672">&amp;gt;=&lt;/span> self.P.&lt;span style="color:#ae81ff">0.&lt;/span>len() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">return&lt;/span> Some(j &lt;span style="color:#f92672">-&lt;/span> self.P.&lt;span style="color:#ae81ff">0.&lt;/span>len());
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> j &lt;span style="color:#f92672">&amp;gt;=&lt;/span> s.&lt;span style="color:#ae81ff">0.&lt;/span>len() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">return&lt;/span> None;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> self.P.&lt;span style="color:#ae81ff">0&lt;/span>[i] &lt;span style="color:#f92672">==&lt;/span> s.&lt;span style="color:#ae81ff">0&lt;/span>[j] {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> i &lt;span style="color:#f92672">+=&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span>;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> j &lt;span style="color:#f92672">+=&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span>;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> } &lt;span style="color:#66d9ef">else&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> i &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> j &lt;span style="color:#f92672">+=&lt;/span> &lt;span style="color:#ae81ff">1&lt;/span>; &lt;span style="color:#75715e">// if P[0] mismatched, try j + 1
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> } &lt;span style="color:#66d9ef">else&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> i &lt;span style="color:#f92672">=&lt;/span> self.W[i];
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-Rust" data-lang="Rust">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">let&lt;/span> idx &lt;span style="color:#f92672">=&lt;/span> pat.match_str(&lt;span style="color:#e6db74">&amp;#34;ababyyabyabxaabyabxabyabyzab&amp;#34;&lt;/span>);
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// -------------
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>println!(&lt;span style="color:#e6db74">&amp;#34;Match found at {}&amp;#34;&lt;/span>, idx.unwrap());
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;pre>&lt;code>Match found at 13
+&lt;/code>&lt;/pre>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-Rust" data-lang="Rust">&lt;/code>&lt;/pre>&lt;/div></content></item></channel></rss>
