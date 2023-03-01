@@ -1,3 +1,13 @@
++++
+title = "KMP String Matching Algorithm"
+date = 2023-03-01T16:04:18+08:00
+draft = false
+tags = ["algorithm"]
+keywords = ["KMP", "string matching"]
+description = "Notes for KMP String Matching Algorithm"
+
++++
+
 # KMP String Matching Algorithm
 
 ## Rational
@@ -21,7 +31,7 @@ When Attempt 1 failed because $S[5] \ne P[5]$, $S[:4]$ has already been matched.
 Therefore, the key to accelerating matching is by locating **longest identical prefix and suffix**(LIPS) in $P[:j]$ for every $j$. We determine these prefixes and suffices with an "next" array $W$, defined as
 
 $$
-W[i] = \max \{k | P[:k] = P[i-k:i]
+W[i] = \max \left \\{k | P[:k] = P[i-k:i] \right \\}
 $$
 
 For example,
@@ -139,25 +149,28 @@ impl Pattern {
     fn match_str(&self, s: &str) -> Option<usize> {
         let mut i = 0;
         let mut j = 0;
-        
-        let s = Chars::from(s);
+        let mut chars = s.chars();
+        let mut c = chars.next();
         
         loop {
             if i >= self.P.0.len() {
                 return Some(j - self.P.0.len());
             }
-            if j >= s.0.len() {
-                return None;
-            }
             
-            if self.P.0[i] == s.0[j] {
-                i += 1;
-                j += 1;
-            } else {
-                if i == 0 {
-                    j += 1;  // if P[0] mismatched, try j + 1
-                } else {
-                    i = self.W[i];
+            match c {
+                None => return None,
+                Some(chr) => {
+                    if self.P.0[i] == chr {
+                        i += 1;
+                        c = chars.next();
+                        j += 1;
+                    } else {
+                        if i == 0 {
+                            c = chars.next();
+                            j += 1;
+                        }  // if P[0] mismatched, try j + 1
+                        else { i = self.W[i]; }
+                    }
                 }
             }
         }
@@ -174,8 +187,3 @@ println!("Match found at {}", idx.unwrap());
 
     Match found at 13
 
-
-
-```Rust
-
-```
