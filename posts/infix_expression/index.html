@@ -1,0 +1,718 @@
+<!doctype html><html lang=en><head><title>Infix Expression :: Danzou1ge6</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="Notes of the Two Stack Algorithm for evaluating infix expression"><meta name=keywords content="two stack,infix expression"><meta name=robots content="noodp"><link rel=canonical href=/posts/infix_expression/><link rel=stylesheet href=/styles.css><link rel="shortcut icon" href=/img/theme-colors/blue.png><link rel=apple-touch-icon href=/img/theme-colors/blue.png><meta name=twitter:card content="summary"><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="og:title" content="Infix Expression"><meta property="og:description" content="Notes of the Two Stack Algorithm for evaluating infix expression"><meta property="og:url" content="/posts/infix_expression/"><meta property="og:site_name" content="Danzou1ge6"><meta property="og:image" content="/img/favicon/blue.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="627"><meta property="article:published_time" content="2023-03-04 14:07:18 +0800 +0800"></head><body class=blue><div class="container center headings--one-size"><header class=header><div class=header__inner><div class=header__logo><a href=/><div class=logo>Danzou1ge6</div></a></div><ul class="menu menu--mobile"><li class=menu__trigger>Menu&nbsp;▾</li><li><ul class=menu__dropdown><li><a href=/about>About</a></li><li><a href=/links>Links</a></li></ul></li></ul></div><nav class=navigation-menu><ul class="navigation-menu__inner menu--desktop"><li><a href=/about>About</a></li><li><a href=/links>Links</a></li></ul></nav></header><div class=content><article class=post><h1 class=post-title><a href=/posts/infix_expression/>Infix Expression</a></h1><div class=post-meta><time class=post-date>2023-03-04 ::</time></div><span class=post-tags>#<a href=/tags/algorithm/>algorithm</a>&nbsp;</span><div class=post-content><div><h1 id=infix-expression>Infix Expression<a href=#infix-expression class=hanchor arialabel=Anchor>&#8983;</a></h1><p>Infix expression are the arithmatical expressions we learned how to evaluate back in primary school, for example,</p><pre tabindex=0><code>1 + 2 * (3 + 4)
+</code></pre><p>is a typical infix expression.</p><p>Besides infix expressions, there are other forms of arithmatical expressions, for example, Poland expressions. Instead of putting the operator between operands, in Poland expressions, operator is placed before two operands.</p><p>Following is a Poland expression, in LISP style.</p><pre tabindex=0><code>(+ (* 2 (+ 3 4)) 1)
+</code></pre><p>Also, there is reverse Poland expression, which place the operator behind two operands</p><pre tabindex=0><code>((((3 4 +) 2 *) 1 +)
+</code></pre><p>Reverse Poland expression is actually the most suitable form for computers, as it resembles how today&rsquo;s stack-based machine instructions work:</p><pre tabindex=0><code>mov $3 %rax    ; store 3 in register rax
+mov $4 %rbx    ; store 4 in rbx
+add %rax %rbx  ; add value in rbx to rax
+mov $2 %rbx
+mul %rax %rbx
+mov $1 %rbx
+add %rax %rbx
+</code></pre><p>It would be wonderful if everyone use reverse Poland expressions, but this is not how the world works. In real world, computers serve people. But who serve the computers? Of course we programmers.</p><pre tabindex=0><code>        serve             serve
+People &lt;------ Computers &lt;------ Programmer
+</code></pre><h2 id=two-stack-algorithm>Two Stack Algorithm<a href=#two-stack-algorithm class=hanchor arialabel=Anchor>&#8983;</a></h2><p>A way to evaluate infix expressions is to use two seperate stacks, one for operands and one for operators.</p><p>We traverse through the expression, and whenever we encounter a operand (a float, integer, whatever), we push it into the operand stack $S_v$. Likewise, whenever we encounter a operator (add, substract, multiply, divide, power, whatever), we need to decided whether to push it into the operator stack $S_o$, or to <strong>reduce</strong> $S_o$ by popping some operators and apply them to operands in $S_v$.</p><p>The tricky part is making the decision based on occurrance of parentheses, combination direction and operator priority. To handle these annoying parentheses, we introduce two set of priorities: in-stack priority $P_1(x)$ and out-stack priority $P_2(x)$, where $x$ is the underlying operator.</p><p>$P_1(x)$ is defined as (left to right, low to high)</p><pre tabindex=0><code>(, + -, * /, ^
+</code></pre><p>and $P_2(x)$ is defined as</p><pre tabindex=0><code>+ -, * /, ^, (
+</code></pre><p>The only difference is the priority of left parentheses <code>(</code>. It has high out-stack priority so that it will always be pushed into stack. On the other hand, it has low in-stack priority so that successing operators can be pushed into stack. Note that the right parentheses <code>)</code> is never pushed into stack.</p><p>We annotate the encountered operator $x$, and the last operator in the stack $x_0$, the last two operands in stack $a$, $b$.</p><ul><li>If $P_2(x) > P_1(x_0)$, push $x$ and do nothing. This is because there may be a higher-priority operator remaining in the expression stream, which need to be applied first, so current one has to wait.</li><li>If $P_2(x) = P_1(x_0)$, reduce operator stack $S_o$ once.</li><li>If $P_2(x) &lt; P_1(x_0)$, reduce operator stack $S_o$ until a <code>(</code> is the top item in stack. This is because according to the rule of pushing operators, the priorities of operators from the top <code>(</code> to <code>x_0</code> strictly ascend, so we can safely combine them from right to left (from stack top to bottom).</li></ul><h2 id=converting-to-poland-and-reverse-poland-expressions>Converting to Poland and reverse Poland expressions<a href=#converting-to-poland-and-reverse-poland-expressions class=hanchor arialabel=Anchor>&#8983;</a></h2><p>Using Two Stack Algorithm, we can also convert infix expressions to other two forms. We simply need to redefine what &ldquo;operators&rdquo; and &ldquo;operands&rdquo; are.</p><p>More specifically, operands are now strings, and operators format operand strings in a certain way. For example, for Poland expression, the logic can be expressed with</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>add</span>(a: PolandExpr, b: PolandExpr) <span style=color:#f92672>-&gt;</span> PolandExpr:
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;(+ </span><span style=color:#e6db74>{</span>a<span style=color:#e6db74>}</span><span style=color:#e6db74> </span><span style=color:#e6db74>{</span>b<span style=color:#e6db74>}</span><span style=color:#e6db74>)&#34;</span>
+</span></span></code></pre></div><p>And similiarly, for reverse Poland expression,</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>mul</span>(a: RevPolandExpr, b: RevPolandExpr) <span style=color:#f92672>-&gt;</span> RevPolandExpr:
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;(</span><span style=color:#e6db74>{</span>a<span style=color:#e6db74>}</span><span style=color:#e6db74> </span><span style=color:#e6db74>{</span>b<span style=color:#e6db74>}</span><span style=color:#e6db74> *)&#34;</span>
+</span></span></code></pre></div><h2 id=rust-implementation>Rust Implementation<a href=#rust-implementation class=hanchor arialabel=Anchor>&#8983;</a></h2><p>Following is a well-documented, robust and unit-tested Rust implementation of the algorithm. It can handle several cases of bad expressions.</p><div class=collapsable-code><input id=1 type=checkbox>
+<label for=1><span class=collapsable-code__language>rust</span>
+<span class=collapsable-code__title>lib.rs</span>
+<span class=collapsable-code__toggle data-label-expand=Show data-label-collapse=Hide></span></label><pre class=language-rust><code>
+
+    mod expr {
+        /// Wraps a Poland expression
+        #[derive(Debug, PartialEq)]
+        pub struct PolandExpr(pub String);
+
+        impl From&lt;String&gt; for PolandExpr {
+            fn from(value: String) -&gt; Self {
+                Self(value)
+            }
+        }
+
+        impl From&lt;f64&gt; for PolandExpr {
+            fn from(value: f64) -&gt; Self {
+                Self(value.to_string())
+            }
+        }
+
+        impl std::fmt::Display for PolandExpr {
+            fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&#39;_&gt;) -&gt; std::fmt::Result {
+                write!(f, &#34;{}&#34;, self.0)
+            }
+        }
+
+        /// Wraps a reverse Poland expression
+        #[derive(Debug, PartialEq)]
+        pub struct RevPolandExpr(pub String);
+
+        impl&lt;&#39;a&gt; From&lt;String&gt; for RevPolandExpr {
+            fn from(value: String) -&gt; Self {
+                Self(value)
+            }
+        }
+
+        impl From&lt;f64&gt; for RevPolandExpr {
+            fn from(value: f64) -&gt; Self {
+                Self(value.to_string())
+            }
+        }
+
+        impl std::fmt::Display for RevPolandExpr {
+            fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&#39;_&gt;) -&gt; std::fmt::Result {
+                write!(f, &#34;{}&#34;, self.0)
+            }
+        }
+    }
+
+    mod marker {
+        use super::expr::{PolandExpr, RevPolandExpr};
+        use super::op::Op;
+
+        /// Marks a type that is the output of the calculator
+        pub trait ResultT: std::fmt::Debug &#43; std::fmt::Display &#43; From&lt;f64&gt; {
+            fn applied(self, op: &amp;Op&lt;Self&gt;, rhs: Self) -&gt; Self;
+        }
+
+        /// Output [`f64`]: the value of the expression
+        impl ResultT for f64 {
+            fn applied(self, op: &amp;Op&lt;Self&gt;, rhs: Self) -&gt; Self {
+                use Op::*;
+                match op {
+                    Add =&gt; self &#43; rhs,
+                    Sub =&gt; self - rhs,
+                    Mul =&gt; self * rhs,
+                    Div =&gt; self / rhs,
+                    Pow =&gt; self.powf(rhs),
+                    _ =&gt; panic!(&#34;Can not apply a parentheses&#34;),
+                }
+            }
+        }
+
+        /// Output [`PolandExpr`]: convert the expression to Poland expression
+        impl ResultT for PolandExpr {
+            /// Apply an [`Op`] to `a` and `b`, returning (`op` `a` b`)
+            fn applied(self, op: &amp;Op&lt;Self&gt;, rhs: Self) -&gt; Self {
+                PolandExpr(format!(&#34;({} {} {})&#34;, op.to_char(), self.0, rhs.0))
+            }
+        }
+
+        /// Output [`RevPolandExpr`]: convert the expression to reverse Poland
+        /// expression
+        impl ResultT for RevPolandExpr {
+            /// Apply an [`Op`] to `a` and `b`, returning (`a` `b` `op`)
+            fn applied(self, op: &amp;Op&lt;Self&gt;, rhs: Self) -&gt; Self {
+                RevPolandExpr(format!(&#34;({} {} {})&#34;, self.0, rhs.0, op.to_char()))
+            }
+        }
+    }
+
+    mod op {
+        use super::marker::ResultT;
+
+        pub trait OpApply&lt;T&gt; {
+            fn apply(&amp;self, a: T, b: T) -&gt; T;
+        }
+
+        /// The operations supported by this calculator
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub enum Op&lt;T: ResultT&gt; {
+            /// Addition
+            Add,
+            /// Subtraction
+            Sub,
+            /// Multiply
+            Mul,
+            /// Division
+            Div,
+            /// Power
+            Pow,
+            /// Left parentheses
+            LP,
+            /// Right parentheses
+            RP,
+            _Phantom(T),
+        }
+
+        impl&lt;T&gt; Op&lt;T&gt;
+        where
+            T: ResultT,
+        {
+            /// The priority of each operator, if it is in the stack.
+            /// Priority determines whether a reduction will be triggered,
+            /// or whether a operator will be pushed
+            pub fn in_stack_priority(&amp;self) -&gt; i32 {
+                use Op::*;
+                match self {
+                    Add =&gt; 1,
+                    Sub =&gt; 1,
+                    Mul =&gt; 2,
+                    Div =&gt; 2,
+                    Pow =&gt; 3,
+                    LP =&gt; 0,
+                    RP =&gt; -1,
+                    _ =&gt; panic!(&#34;_Phantom should never be instantiated!&#34;),
+                }
+            }
+
+            /// The priority of each operator, if it is outside the stack
+            pub fn out_stack_priority(&amp;self) -&gt; i32 {
+                use Op::*;
+                match self {
+                    Add =&gt; 1,
+                    Sub =&gt; 1,
+                    Mul =&gt; 2,
+                    Div =&gt; 2,
+                    Pow =&gt; 3,
+                    LP =&gt; 99,
+                    RP =&gt; -1,
+                    _ =&gt; panic!(&#34;_Phantom should never be instantiated!&#34;),
+                }
+            }
+
+            /// Parse a [`Op`] from a [`char`]. Returns [`None`] on failure.
+            pub fn parse(s: char) -&gt; Option&lt;Self&gt; {
+                use Op::*;
+                match s {
+                    &#39;&#43;&#39; =&gt; Some(Add),
+                    &#39;-&#39; =&gt; Some(Sub),
+                    &#39;*&#39; =&gt; Some(Mul),
+                    &#39;/&#39; =&gt; Some(Div),
+                    &#39;^&#39; =&gt; Some(Pow),
+                    &#39;(&#39; =&gt; Some(LP),
+                    &#39;)&#39; =&gt; Some(RP),
+                    _ =&gt; None,
+                }
+            }
+
+            pub fn to_char(&amp;self) -&gt; char {
+                use Op::*;
+                match self {
+                    Add =&gt; &#39;&#43;&#39;,
+                    Sub =&gt; &#39;-&#39;,
+                    Mul =&gt; &#39;*&#39;,
+                    Div =&gt; &#39;/&#39;,
+                    Pow =&gt; &#39;^&#39;,
+                    LP =&gt; &#39;(&#39;,
+                    RP =&gt; &#39;)&#39;,
+                    _ =&gt; panic!(&#34;_Phantom should never be instantiated!&#34;),
+                }
+            }
+
+            pub fn is_right_parentheses(&amp;self) -&gt; bool {
+                if let Op::RP = self {
+                    true
+                } else {
+                    false
+                }
+            }
+
+            pub fn is_left_parentheses(&amp;self) -&gt; bool {
+                if let Op::LP = self {
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+
+        impl&lt;T&gt; OpApply&lt;T&gt; for Op&lt;T&gt;
+        where
+            T: ResultT,
+        {
+            fn apply(&amp;self, a: T, b: T) -&gt; T {
+                a.applied(self, b)
+            }
+        }
+    }
+
+    mod error {
+        /// Indicates an error happened in evaluation
+        #[derive(Debug)]
+        pub enum Error {
+            /// A string slice can not be interpreted into an operand (float) nor an operator
+            UnknownSymbol(String),
+            /// Too many right parentheses are in the expression
+            TooManyRP,
+            /// Not enough operands are in the expression
+            InsufficientOperands,
+            /// Too many left parentheses are in the expression
+            TooManyLP,
+        }
+
+        impl std::fmt::Display for Error {
+            fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&#39;_&gt;) -&gt; std::fmt::Result {
+                match self {
+                    Error::UnknownSymbol(sym) =&gt; write!(f, &#34;Unknown Symbol {}&#34;, sym),
+                    Error::TooManyRP =&gt; write!(f, &#34;Too many right parentheses&#34;),
+                    Error::InsufficientOperands =&gt; write!(f, &#34;Insufficient operands&#34;),
+                    Error::TooManyLP =&gt; write!(f, &#34;Too many left parentheses&#34;),
+                }
+            }
+        }
+    }
+
+    mod token {
+        use std::marker::PhantomData;
+
+        use super::error::Error;
+        use super::marker::ResultT;
+        use super::op::Op;
+
+        /// Either an operator or a value
+        #[derive(Debug)]
+        pub enum Token&lt;T&gt;
+        where
+            T: ResultT,
+        {
+            Op(Op&lt;T&gt;),
+            Val(f64),
+        }
+
+        /// An iterator over string slice, yielding [`Token`]
+        pub struct Tokens&lt;&#39;a, T&gt; {
+            s: &amp;&#39;a str,
+            buf: String,
+            _phantom: PhantomData&lt;T&gt;,
+        }
+
+        impl&lt;&#39;a, T&gt; Tokens&lt;&#39;a, T&gt;
+        where
+            T: ResultT,
+        {
+            pub fn new(s: &amp;&#39;a str) -&gt; Self {
+                Self {
+                    s,
+                    buf: String::new(),
+                    _phantom: PhantomData,
+                }
+            }
+
+            /// Try to parse whatever inside `self.buf` as a [`f64`], and return it
+            /// wrapped inside a [`Token`]. A [`Error::UnknownSymbol`] is thrown if
+            /// it cannot be parsed.
+            fn dump_buf(&amp;mut self) -&gt; Result&lt;Token&lt;T&gt;, Error&gt; {
+                return self
+                    .buf
+                    .parse::&lt;f64&gt;()
+                    .map_err(|_| {
+                        let sym = std::mem::take(&amp;mut self.buf);
+                        Error::UnknownSymbol(sym)
+                    })
+                    .map(|x| {
+                        self.buf.clear();
+                        Token::Val(x)
+                    });
+            }
+        }
+
+        impl&lt;&#39;a, T&gt; Iterator for Tokens&lt;&#39;a, T&gt;
+        where
+            T: ResultT,
+        {
+            type Item = Result&lt;Token&lt;T&gt;, Error&gt;;
+            fn next(&amp;mut self) -&gt; Option&lt;Self::Item&gt; {
+                let mut chars = self.s.chars();
+
+                while let Some(next_char) = chars.next() {
+                    if next_char == &#39; &#39; {
+                        self.s = &amp;self.s[next_char.len_utf8()..];
+                        continue;
+                    }
+
+                    match Op::parse(next_char) {
+                        None =&gt; {
+                            self.buf.push(next_char);
+                            self.s = &amp;self.s[next_char.len_utf8()..]
+                        }
+
+                        Some(op) =&gt; {
+                            if self.buf.len() == 0 {
+                                // No non-operator symbol encountered
+                                self.s = &amp;self.s[next_char.len_utf8()..];
+                                return Some(Ok(Token::Op(op)));
+                            } else {
+                                // Some non-operator symbols encountered, try parse them into value
+                                return Some(self.dump_buf());
+                            }
+                        }
+                    }
+                }
+
+                if self.buf.len() == 0 {
+                    None
+                } else {
+                    Some(self.dump_buf())
+                }
+            }
+        }
+    }
+
+    pub use error::Error;
+    pub use expr::{PolandExpr, RevPolandExpr};
+    pub use marker::ResultT;
+    pub use op::Op;
+    use op::OpApply;
+    pub use token::{Token, Tokens};
+
+    /// The calculator
+    /// The behavior of the calculator depends on `T`.
+    /// - If `T` is [`f64`], the calculator evaluates the value of the expression
+    /// - If `T` is [`PolandExpr`] or [`RevPolandExpr`], the calculator converts
+    ///   the expression to Poland and reverse Poland expression respectively.
+    /// Spaces in the expression are ignored.
+    ///
+    /// ```
+    /// use calculator::*;
+    /// let mut calc = Calculator::&lt;f64&gt;::new();
+    /// let out = calc.eval(&#34;1 &#43; 2&#34;).unwrap();
+    /// assert!((out - 3.0).abs() &lt; 1e-6);
+    /// ```
+    /// ```
+    /// use calculator::*;
+    /// let mut calc = Calculator::&lt;PolandExpr&gt;::new();
+    /// let out = calc.eval(&#34;1&#43;2&#34;).unwrap();
+    /// assert_eq!(out.0, &#34;(&#43; 1 2)&#34;);
+    /// ```
+    pub struct Calculator&lt;T&gt;
+    where
+        T: ResultT,
+    {
+        op_stack: Vec&lt;Op&lt;T&gt;&gt;,
+        val_stack: Vec&lt;T&gt;,
+    }
+
+    impl&lt;T&gt; Calculator&lt;T&gt;
+    where
+        T: ResultT,
+    {
+        /// Create a new calculator
+        pub fn new() -&gt; Self {
+            Self {
+                op_stack: vec![Op::LP],
+                val_stack: Vec::new(),
+            }
+        }
+
+        /// Reset the internal state. Used for recovering from error.
+        /// Using this instead of creating a new instance reduces memory allocation.
+        pub fn reset(&amp;mut self) {
+            self.op_stack.clear();
+            self.val_stack.clear();
+            self.op_stack.push(Op::LP);
+        }
+
+        /// Evaluate an expression
+        pub fn eval(&amp;mut self, expr: &amp;str) -&gt; Result&lt;T, Error&gt; {
+            let mut token_stream = Tokens::new(expr);
+
+            while let Some(token) = token_stream.next() {
+                let token = token?;
+
+                match token {
+                    Token::Val(val) =&gt; self.val_stack.push(val.into()),
+                    Token::Op(op) =&gt; self.process_op(op)?,
+                };
+            }
+
+            // pretending that there is a trailing RP, to match the LP put initially in op_stack
+            self.reduce_op_stack()?;
+
+            // As operands are delimitated using operators, there can&#39;t be too many operands
+            // (But there can be less, which throws InsufficientOperands)
+            if self.val_stack.len() != 1 {
+                panic!(
+                    &#34;val_stack should have only one item, but now val_stack={:?}&#34;,
+                    self.val_stack
+                );
+            }
+
+            if self.op_stack.len() != 0 {
+                return Err(Error::TooManyLP);
+            }
+
+            // put back the initial LP for next evaluation
+            self.op_stack.push(Op::LP);
+
+            Ok(self.val_stack.pop().unwrap())
+        }
+
+        /// Pop an operator from op_stack and apply it to last-two operands in
+        /// val_stack, pushing the result back into the val_stack.
+        fn reduce_op_stack_once(&amp;mut self) -&gt; Result&lt;Option&lt;()&gt;, Error&gt; {
+            let top_op = self
+                .op_stack
+                .pop()
+                .map_or(Err(Error::TooManyRP), |x| Ok(x))?;
+
+            if top_op.is_left_parentheses() {
+                return Ok(None);
+            }
+
+            let operand_r = self
+                .val_stack
+                .pop()
+                .map_or(Err(Error::InsufficientOperands), |x| Ok(x))?;
+            let operand_l = self
+                .val_stack
+                .pop()
+                .map_or(Err(Error::InsufficientOperands), |x| Ok(x))?;
+
+            self.val_stack.push(top_op.apply(operand_l, operand_r));
+
+            Ok(Some(()))
+        }
+
+        /// Repeatedly pop operator from op_stack and apply it. Stop when a LP
+        /// is encountered. The LP is consumed.
+        fn reduce_op_stack(&amp;mut self) -&gt; Result&lt;(), Error&gt; {
+            loop {
+                if self.reduce_op_stack_once()?.is_none() {
+                    break;
+                }
+            }
+
+            Ok(())
+        }
+
+        fn process_op(&amp;mut self, op: Op&lt;T&gt;) -&gt; Result&lt;(), Error&gt; {
+            // op_stack should at least have a LP; If no operators are left in the
+            // stack but operators are still feeding in, it must be that there are
+            // too many RPs
+            let top_op = self
+                .op_stack
+                .last()
+                .map_or(Err(Error::TooManyRP), |x| Ok(x))?;
+
+            if op.is_right_parentheses() {
+                self.reduce_op_stack()?;
+            } else if op.out_stack_priority() &gt; top_op.in_stack_priority() {
+                self.op_stack.push(op);
+            } else if op.out_stack_priority() &lt; top_op.in_stack_priority() {
+                self.reduce_op_stack()?;
+                // the LP is consumed by reduce_op_stack. It must be added back as
+                // the corresponding RP isn&#39; reached yet.
+                self.op_stack.push(Op::LP);
+                self.op_stack.push(op);
+            } else {
+                // in-stack priority equals out-stack
+                self.reduce_op_stack_once()?;
+                self.op_stack.push(op);
+            }
+
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn test_token() {
+            let s = &#34;1&#43;(3*4/5)^6&#34;;
+            let tokens: Vec&lt;_&gt; = Tokens::new(s).collect();
+            let tokens: Vec&lt;Token&lt;f64&gt;&gt; = tokens.into_iter().map(|x| x.unwrap()).collect();
+
+            use Op::*;
+            use Token::Op as TOp;
+            use Token::Val;
+            let should_be = vec![
+                Val(1.0),
+                TOp(Add),
+                TOp(LP),
+                Val(3.0),
+                TOp(Mul),
+                Val(4.0),
+                TOp(Div),
+                Val(5.0),
+                TOp(RP),
+                TOp(Pow),
+                Val(6.0),
+            ];
+
+            println!(&#34;{:?}&#34;, tokens);
+            assert_eq!(tokens.len(), should_be.len());
+            for (tok, ans) in tokens.iter().zip(should_be.iter()) {
+                match (tok, ans) {
+                    (TOp(a), TOp(b)) =&gt; assert_eq!(a, b),
+                    (Val(a), Val(b)) =&gt; assert!((a - b).abs() &lt; 1e-6),
+                    _ =&gt; panic!(&#34;Not equal. tokens={:?}&#34;, tokens),
+                }
+            }
+        }
+
+        #[test]
+        #[should_panic]
+        fn test_token_err() {
+            let s = &#34;ab&#34;;
+            let tokens: Vec&lt;_&gt; = Tokens::new(s).collect();
+            let _: Vec&lt;Token&lt;f64&gt;&gt; = tokens.into_iter().map(|x| x.unwrap()).collect();
+        }
+
+        fn assert_ans(val: f64, ans: f64) {
+            if (val - ans).abs() &gt; 1e-6 {
+                panic!(&#34;output={}, but ans={}&#34;, val, ans);
+            }
+        }
+
+        fn cf() -&gt; Calculator&lt;f64&gt; {
+            Calculator::new()
+        }
+        fn cp() -&gt; Calculator&lt;PolandExpr&gt; {
+            Calculator::new()
+        }
+
+        #[test]
+        fn test_eval() {
+            assert_ans(cf().eval(&#34;1&#43;2&#34;).unwrap(), 3.0);
+            assert_ans(cf().eval(&#34;1*2&#43;3/1-2^2&#34;).unwrap(), 1.0);
+            assert_ans(cf().eval(&#34;2*2*(4-3)&#43;8&#34;).unwrap(), 12.0);
+            assert_ans(cf().eval(&#34;3&#43;2*(4-3*2/2&#43;4)*(1&#43;2)&#34;).unwrap(), 33.0);
+            assert_ans(cf().eval(&#34;2*((1&#43;2)/3&#43;2*(4-3))-2^(3-2)&#34;).unwrap(), 4.0);
+            assert_ans(cf().eval(&#34;8-1-2&#34;).unwrap(), 5.0);
+            assert_ans(cf().eval(&#34;12/2/2&#34;).unwrap(), 3.0);
+            assert_ans(cf().eval(&#34;1&#43;2*(1*5-2-2*1)&#43;5&#34;).unwrap(), 8.0);
+        }
+
+        #[test]
+        fn test_err() {
+            let out = cf().eval(&#34;1&#43;&#34;);
+            if let Err(Error::InsufficientOperands) = out {
+            } else {
+                panic!(&#34;out should be insufficient operands error&#34;)
+            };
+
+            let out = cf().eval(&#34;1&#43;2)&#34;);
+            if let Err(Error::TooManyRP) = out {
+            } else {
+                panic!(&#34;out should be too many RP error&#34;)
+            };
+        }
+
+        #[test]
+        fn test_to_poland() {
+            assert_eq!(cp().eval(&#34;1&#43;2&#34;).unwrap(), &#34;(&#43; 1 2)&#34;.to_string().into());
+            assert_eq!(
+                cp().eval(&#34;1*2&#43;3/1-2^2&#34;).unwrap(),
+                &#34;(- (&#43; (* 1 2) (/ 3 1)) (^ 2 2))&#34;.to_string().into()
+            );
+            assert_eq!(
+                cp().eval(&#34;2*2*(4-3)&#43;8&#34;).unwrap(),
+                &#34;(&#43; (* (* 2 2) (- 4 3)) 8)&#34;.to_string().into()
+            );
+        }
+    }
+
+</code></pre></div><p>With a simple commandline interface:</p><div class=collapsable-code><input id=2 type=checkbox>
+<label for=2><span class=collapsable-code__language>rust</span>
+<span class=collapsable-code__title>main.rs</span>
+<span class=collapsable-code__toggle data-label-expand=Show data-label-collapse=Hide></span></label><pre class=language-rust><code>
+
+    use indoc::indoc;
+    use pico_args::Arguments;
+    use std::ffi::OsString;
+    use std::io::{stdin, stdout, Write};
+
+    use calculator::Calculator;
+    use calculator::PolandExpr;
+    use calculator::ResultT;
+    use calculator::RevPolandExpr;
+
+    /// REPL mode
+    fn repl&lt;T: ResultT&gt;(mut calc: Calculator&lt;T&gt;) {
+        let mut buf = String::new();
+
+        loop {
+            print!(&#34;&gt; &#34;);
+            stdout().flush().unwrap();
+            stdin().read_line(&amp;mut buf).unwrap();
+
+            match calc.eval(&amp;buf.trim()) {
+                Err(e) =&gt; {
+                    println!(&#34;! {}&#34;, e);
+                    calc.reset();
+                }
+                Ok(val) =&gt; println!(&#34;= {}&#34;, val),
+            }
+
+            buf.clear();
+        }
+    }
+
+    /// Evaluate and Print
+    fn ep&lt;T: ResultT&gt;(mut calc: Calculator&lt;T&gt;, exprs: Vec&lt;&amp;str&gt;) {
+        let mut exit_flag = 0;
+
+        for expr in exprs {
+            match calc.eval(expr) {
+                Err(e) =&gt; {
+                    println!(&#34;! {}&#34;, e);
+                    calc.reset();
+                    exit_flag &#43;= 1;
+                }
+                Ok(val) =&gt; println!(&#34;{}&#34;, val),
+            }
+        }
+
+        std::process::exit(exit_flag);
+    }
+
+    fn finish&lt;T: ResultT&gt;(calc: Calculator&lt;T&gt;, left_args: Vec&lt;OsString&gt;) {
+        if left_args.len() == 0 {
+            repl(calc);
+        } else {
+            ep(
+                calc,
+                left_args.iter().map(|x| x.to_str().unwrap()).collect(),
+            );
+        }
+    }
+
+    static HELP: &amp;str = indoc! {&#34;
+    Usage: %prog [-h] [-p|-r] [exprs..]
+
+    Options
+        -h       : Show this message
+        -p       : Calculate Poland expression
+        -r       : Calculate reverse Poland expression
+        Otherwise: Evaluate the expression
+
+    Arguments
+        A list of expressions. If expressions are provided, they will be evaluated
+        in succession, and the result will be printed line-by-line. If one expression
+        is bad, the corresponding line will start with &#39;!&#39;, followed with a error
+        message.
+
+        If no expression is provided, REPL mode will be activated.
+
+    Exit Codes
+        0     : All good
+        Other : If not in REPL mode, indicates the number of bad expressions
+    &#34;};
+
+    fn main() {
+        let mut args = Arguments::from_env();
+
+        if args.contains(&#34;-h&#34;) {
+            println!(&#34;{HELP}&#34;);
+            std::process::exit(0);
+        } else if args.contains(&#34;-p&#34;) {
+            let calc = Calculator::&lt;PolandExpr&gt;::new();
+            finish(calc, args.finish());
+        } else if args.contains(&#34;-r&#34;) {
+            let calc = Calculator::&lt;RevPolandExpr&gt;::new();
+            finish(calc, args.finish());
+        } else {
+            let calc = Calculator::&lt;f64&gt;::new();
+            finish(calc, args.finish());
+        }
+    }
+
+</code></pre></div><p>The interface depends on <code>indoc = "2.0.0"</code> and <code>pico-args = "0.5.0"</code>.</p></div></div><div class=pagination><div class=pagination__title><span class=pagination__title-h>Read other posts</span><hr></div><div class=pagination__buttons><span class="button next"><a href=/posts/josephring/><span class=button__text>Extended Joseph Ring</span>
+<span class=button__icon>→</span></a></span></div></div></article></div><footer class=footer><div class=footer__inner><div class=copyright><span>© 2023 Powered by <a href=http://gohugo.io>Hugo</a></span>
+<span>:: <a href=https://github.com/panr/hugo-theme-terminal target=_blank>Theme</a> made by <a href=https://github.com/panr target=_blank>panr</a></span></div></div></footer><script type=text/javascript src=/bundle.min.js></script></div><link href=https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.4/katex.min.css rel=stylesheet><script src=https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.4/katex.min.js></script>
+<script src=https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.4/contrib/auto-render.min.js></script>
+<script>document.addEventListener("DOMContentLoaded",function(){renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:!0},{left:"$",right:"$",display:!1},{left:"\\(",right:"\\)",display:!1},{left:"\\[",right:"\\]",display:!0}]}),console.log("Katex rendered.")})</script></body></html>
