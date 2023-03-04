@@ -62,9 +62,9 @@ For example, when $i = B$, there exists LIPS "abyab", however when $i = C$, ther
 Therefore, all we have to do when $P[k] \ne P[i]$ is:
 
 - Find the LIPS of $P[:k]$, length of which has been calculated and stored in $W[k] = l$.
-- See if $P[l] = P[i]$. If so, $W[i + 1]$ would be $l + 1$. Otherwise, $W[i + 1]$ would be 0.
+- See if $P[l] = P[i]$. If so, $W[i + 1]$ would be $l + 1$. Otherwise, set $l$ to $W[l]$ and try again, until $l$ reaches $0$.
 
-The Rust code for solving $W$ is listed below. (To simplify stuff, char codes stored in `Vec<char>` is used instead of UTF-8 encoded `String`)
+The Rust code for solving $W$ is listed below.
 
 
 ```Rust
@@ -97,13 +97,25 @@ impl Pattern {
         W.resize(P.0.len(), 0);
         
         for i in 1..P.0.len() - 1 {
-            let k = W[i];
+            let mut k = W[i];
             
             W[i + 1] = if P.0[i] == P.0[k] {
                 k + 1
+                
             } else {
-                let l = W[k];
-                if P.0[l] == P.0[i] { l + 1 } else { 0 }
+                let mut r = 0;
+                loop {
+                    k = W[k];
+                    
+                    if k == 0 {
+                        r = 0;
+                        break;
+                    } else if P.0[k] == P.0[i] {
+                        r = k + 1;
+                        break;
+                    }
+                }
+                r
             };
         }
         
@@ -178,6 +190,8 @@ impl Pattern {
 }
 ```
 
+Following is the result of the matching. $P$ is marked using "---"
+
 
 ```Rust
 let idx = pat.match_str("ababyyabyabxaabyabxabyabyzab");
@@ -187,3 +201,8 @@ println!("Match found at {}", idx.unwrap());
 
     Match found at 13
 
+
+
+```Rust
+
+```
